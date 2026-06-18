@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+
+{% block title %}ベット企画 - 新卒交流会{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center g-4">
+    <!-- Main Bet Slip Column -->
+    <div class="col-lg-7 col-xl-6">
+        <div class="glass-card shadow-lg p-5 rounded-5 border border-secondary text-center position-relative overflow-hidden">
+            {% if event %}
+                <!-- Step Indicator / Odds -->
+                <div class="step-badge px-3 py-1 rounded-pill mb-4 d-inline-block font-outfit text-accent">
+                    倍率: {{ event.multiplier }}倍の企画
+                </div>
+                
+                <!-- Event Title -->
+                <h2 class="h3 fw-bold text-white mb-2 font-outfit text-gradient">
+                    {{ event.event_name }}
+                </h2>
+                <p class="text-muted text-xs mb-4">獲得した大切なポイントを賭けて、最大 {{ event.multiplier }} 倍を狙え！</p>
+                
+                {% if event.status == 'betting' %}
+                    {% if not submitted_bet %}
+                        <!-- Betting Slip Form -->
+                        <form action="{{ url_for('quiz.bet_view') }}" method="POST" id="betForm" class="text-start mt-4">
+                            <input type="hidden" name="event_id" value="{{ event.event_id }}">
+                            <input type="hidden" name="multiplier" id="multiplier_input" value="1.0">
+                            <input type="hidden" name="prediction" id="prediction_input" value="">
+
+                            <!-- Prediction Selector (Dynamic Options) -->
+                            <div class="mb-4">
+                                <label class="form-label text-white-50 small"><i class="bi bi-patch-question me-1"></i>あなたの予想（選択すると倍率が確定します）</label>
+                                <div class="row g-2">
+                                    {% for opt in options %}
+                                    <div class="col-6">
+                                        <input type="radio" class="btn-check" name="opt_choice" id="opt_{{ opt.option_id }}" value="{{ opt.option_text }}" data-multiplier="{{ opt.multiplier }}" required onclick="selectOption('{{ opt.option_text }}', {{ opt.multiplier }})">
+                                        <label class="btn btn-outline-secondary w-100 py-2 rounded-3 border-2 text-start position-relative" for="opt_{{ opt.option_id }}">
+                                            <div class="text-white-50 text-3xs mb-0.5">{{ opt.multiplier }}倍</div>
+                                            <div class="text-white fw-bold text-xs">{{ opt.option_text }}</div>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <!-- Points Amount Picker -->
+                            <div class="mb-4">
+                                <label for="bet_points" class="form-label text-white-50 small"><i class="bi bi-cash-coin me-1"></i>賭けるポイント</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control bg-dark border-secondary text-white text-center font-outfit fw-bold fs-4 py-2" id="bet_points" name="bet_points" min="1" max="{{ team_points }}" value="100" required oninput="validateBet(this.value)">
+                                    <span class="input-group-text bg-secondary border-secondary text-white font-outfit fw-bold">pt</span>
+                                </div>
+                                <div class="d-flex justify-content-between mt-2 text-2xs text-muted">
+                                    <span>現在の持ち点: {{ team_points }}pt</span>
+                                    <span>最小 1pt / 最大 {{ team_points }}pt</span>
+                                </div>
+                                
+                                <!-- Quick Bet Buttons -->
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(100)">100pt</button>
+                                    <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(500)">500pt</button>
+                                    <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(Math.floor({{ team_points }} / 2))">ハーフ</button>
+                                    <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet({{ team_points }})">全額</button>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100 rounded-pill py-2.5 fw-bold font-outfit mt-4 shadow-neon" id="betSubmitBtn">
+                                <i class="bi bi-shield-check me-1"></i> ベットを確定する
+                            </button>
+                        </form>
+                    {% else %}
+                        <!-- Submitted Bet State -->
+                        <div class="submitted-state mt-4 p-4 rounded-4 bg-dark-50 border border-secondary">
+                            <div class="spinner-grow text-accent mb-3" role="status" style="width: 2rem; height: 2rem;"></div>
+                            <h4 class="h5 text-white fw-bold mb-2">ベットを受け付けました！</h4>
+                            <p class="text-muted text-sm mb-4">結果が確定するまで、MCによる実況・清算をお待ちください。</p>
+                            
+                            <div class="card bg-dark border-secondary p-3 rounded-4 text-start">
+                                <div class="row g-3">
+                                    <div class="col-7">
+                                        <span class="text-white-50 text-2xs d-block">あなたの予想</span>
+                                        <strong class="text-white font-outfit text-sm d-block mt-1">{{ submitted_bet.prediction }}</strong>
+                                        <span class="badge bg-secondary-50 text-white-50 text-3xs mt-1">{{ submitted_bet.multiplier }}倍</span>
+                                    </div>
+                                    <div class="col-5 text-end">
+                                        <span class="text-white-50 text-2xs d-block">賭けポイント</span>
+                                        <strong class="text-accent font-outfit fs-5 d-block mt-1">{{ submitted_bet.bet_points }} <span class="text-xs">pt</span></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <!-- Closed State (Waiting for results) -->
+                    <div class="py-5">
+                        <div class="icon-circle bg-dark-50 text-muted mx-auto mb-4" style="width: 80px; height: 80px; font-size: 2.5rem;">
+                            <i class="bi bi-lock-fill text-danger"></i>
+                        </div>
+                        <h3 class="h4 fw-bold text-white mb-2 font-outfit">ベット締め切り</h3>
+                        <p class="text-muted mb-4">この企画へのベット受付は締め切られました。<br>判定結果の発表をお待ちください。</p>
+                        
+                        {% if submitted_bet %}
+                            <div class="card bg-dark border-secondary p-3 rounded-4 text-start d-inline-block px-5">
+                                <div class="d-flex align-items-center gap-4">
+                                    <div>
+                                        <span class="text-white-50 text-2xs">あなたの予想</span>
+                                        <strong class="text-white font-outfit fs-5 d-block">{{ submitted_bet.prediction }}</strong>
+                                    </div>
+                                    <div class="border-start border-secondary py-3 px-1"></div>
+                                    <div>
+                                        <span class="text-white-50 text-2xs">賭けポイント</span>
+                                        <strong class="text-accent font-outfit fs-5 d-block">{{ submitted_bet.bet_points }} pt</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% else %}
+                <!-- Empty State (No Betting Event) -->
+                <div class="py-5">
+                    <div class="icon-circle bg-dark-50 text-muted mx-auto mb-4" style="width: 80px; height: 80px; font-size: 2.5rem;">
+                        <i class="bi bi-dice-5"></i>
+                    </div>
+                    <h3 class="h4 fw-bold text-white mb-2 font-outfit">ベット企画準備中</h3>
+                    <p class="text-muted mb-0">現在、開催中のベット企画はありません。<br>MCからアナウンスがあるまでお待ちください。</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function selectOption(text, multiplier) {
+        document.getElementById('prediction_input').value = text;
+        document.getElementById('multiplier_input').value = multiplier;
+    }
+
+    function validateBet(val) {
+        const max = parseInt(document.getElementById('bet_points').getAttribute('max'));
+        const btn = document.getElementById('betSubmitBtn');
+        const num = parseInt(val);
+        
+        if (num > max || num <= 0 || isNaN(num)) {
+            btn.setAttribute('disabled', 'true');
+        } else {
+            btn.removeAttribute('disabled');
+        }
+    }
+
+    function setQuickBet(val) {
+        const input = document.getElementById('bet_points');
+        input.value = val;
+        validateBet(val);
+    }
+
+    // MCの操作（ベット開始・締切・清算）を反映するためにSocket.IOで通信
+    socket.on('event_update', (data) => {
+        location.reload();
+    });
+</script>
+{% endblock %}

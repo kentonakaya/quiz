@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}アリーナ入場 - 新卒交流会{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center min-vh-75">
+    <div class="col-md-6 col-lg-5">
+        <div class="neon-card shadow-lg p-5 rounded-5 border border-secondary text-center">
+            <div class="mb-4">
+                <i class="bi bi-fire text-gradient display-3 mb-2 d-inline-block"></i>
+                <h1 class="h2 fw-bold text-white font-outfit text-gradient">NEW GENERATION BATTLE</h1>
+                <p class="text-muted">チームを選択してアリーナに入場してください</p>
+            </div>
+            
+            <form action="{{ url_for('quiz.login') }}" method="POST">
+                <input type="hid 
+                den" name="role" id="loginRole" value="team">
+                
+                <div id="teamSelectGroup" class="mb-4 text-start">
+                    <label for="team_id" class="form-label text-white-50 small"><i class="bi bi-people me-1"></i>あなたのチーム</label>
+                    <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5" id="team_id" name="team_id">
+                        {% for t in teams %}
+                            <option value="{{ t.team_id }}">{{ t.team_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100 rounded-pill py-2.5 fw-bold font-outfit mb-3 shadow-neon">
+                    アリーナに入場する <i class="bi bi-box-arrow-in-right ms-1"></i>
+                </button>
+            </form>
+            
+            <div class="d-flex justify-content-center mt-4 text-xs">
+                <button type="button" id="adminToggleBtn" class="btn btn-link btn-xs text-muted text-decoration-none" onclick="toggleAdminMode()">
+                    <i class="bi bi-shield-lock me-1"></i>司会・管理者はこちら
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleAdminMode() {
+        const roleInput = document.getElementById('loginRole');
+        const teamGroup = document.getElementById('teamSelectGroup');
+        const toggleBtn = document.getElementById('adminToggleBtn');
+        const btn = document.querySelector('button[type="submit"]');
+        
+        if (roleInput.value === 'team') {
+            roleInput.value = 'admin';
+            teamGroup.style.display = 'none';
+            btn.innerHTML = '管理者として入場する <i class="bi bi-shield-lock ms-1"></i>';
+            toggleBtn.innerHTML = '<i class="bi bi-people me-1"></i>チーム選択に戻る';
+        } else {
+            roleInput.value = 'team';
+            teamGroup.style.display = 'block';
+            btn.innerHTML = 'アリーナに入場する <i class="bi bi-box-arrow-in-right ms-1"></i>';
+            toggleBtn.innerHTML = '<i class="bi bi-shield-lock me-1"></i>司会・管理者はこちら';
+        }
+    }
+</script>
+{% endblock %}

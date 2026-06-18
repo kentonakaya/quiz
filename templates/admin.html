@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+
+{% block title %}MC操作盤 - 新卒交流会{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <h2 class="h3 fw-bold text-white font-outfit mb-1"><i class="bi bi-shield-lock text-warning me-2"></i>MC操作盤 (管理者コンソール)</h2>
+            <p class="text-muted">司会進行用のコントロールパネルです。参加者の画面とリアルタイムに連動します。</p>
+        </div>
+        
+        <!-- Danger Reset Actions -->
+        <div>
+            <form action="{{ url_for('quiz.admin_reset') }}" method="POST" onsubmit="return confirm('本当にすべての回答・ベットデータをリセットし、チームの持ち点を 500pt に初期化しますか？');">
+                <button type="submit" class="btn btn-outline-danger rounded-pill px-4 btn-sm">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>全企画データ初期化
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Quiz Controls Column -->
+    <div class="col-lg-7">
+        <div class="glass-card shadow-lg p-4 rounded-4 border border-secondary mb-4">
+            <h3 class="h5 fw-bold text-white mb-3"><i class="bi bi-trophy text-primary me-2"></i>第1部 : 4択クイズ管理</h3>
+            
+            <div class="d-flex flex-column gap-3">
+                {% for q in questions %}
+                    <div class="card bg-dark border-secondary p-3 rounded-4">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <div>
+                                <span class="badge bg-secondary font-outfit">第 {{ q.question_num }} 問</span>
+                                <span class="text-white-50 text-xs ms-2">正解: <strong>{{ q.correct_choice }}</strong></span>
+                            </div>
+                            <div>
+                                {% if q.status == 'hidden' %}
+                                    <span class="badge bg-dark-50 text-muted border border-secondary rounded-pill text-2xs">待機中</span>
+                                {% elif q.status == 'active' %}
+                                    <span class="badge bg-success-50 text-success border border-success-subtle rounded-pill text-2xs animate-pulse">回答受付中</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-50 text-white-50 rounded-pill text-2xs">正解発表済</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <p class="text-white fw-bold mb-3 text-sm">{{ q.question_text }}</p>
+                        
+                        <!-- Control Actions -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-2 border-top border-secondary">
+                            <span class="text-muted text-3xs">
+                                選択肢: A:{{ q.choice_a[:10] }}... | B:{{ q.choice_b[:10] }}... | C:{{ q.choice_c[:10] }}... | D:{{ q.choice_d[:10] }}...
+                            </span>
+                            
+                            <div class="d-flex gap-2">
+                                {% if q.status == 'hidden' or q.status == 'revealed' %}
+                                    <form action="{{ url_for('quiz.admin_activate_quiz', quiz_id=q.quiz_id) }}" method="POST">
+                                        <button type="submit" class="btn btn-primary btn-xs rounded-pill px-3">
+                                            出題開始
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                
+                                {% if q.status == 'active' %}
+                                    <form action="{{ url_for('quiz.admin_reveal_quiz', quiz_id=q.quiz_id) }}" method="POST" class="d-flex align-items-center gap-2">
+                                        <input type="hidden" name="award_points" value="100">
+                                        <button type="submit" class="btn btn-success btn-xs rounded-pill px-3">
+                                            正解発表 (+100pt)
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Bingo Approval Log -->
+        <div class="glass-card shadow-lg p-4 rounded-4 border border-secondary">
+            <h3 class="h5 fw-bold text-white mb-3"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>ビンゴ回答承認待ち</h3>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-dark table-hover align-middle mb-0 text-white-50 text-xs">
+                    <thead>
+                        <tr class="text-white border-secondary">
+                            <th>チーム</th>
+                            <th>マス</th>
+                            <th>内容</th>
+                            <th class="text-end">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if pending_squares %}
+                            {% for s in pending_squares %}
+                                <tr class="border-secondary">
+                                    <td class="fw-bold text-purple">{{ team_map[s.team_id] }}</td>
+                                    <td class="text-white-50">#{{ s.position }}</td>
+                                    <td class="text-white">「{{ s.content }}」</td>
+                                    <td class="text-end">
+                                        <div class="d-flex gap-1 justify-content-end">
+                                            <form action="{{ url_for('quiz.admin_approve_bingo', square_id=s.square_id) }}" method="POST">
+                                                <input type="hidden" name="status" value="approved">
+                                                <button type="submit" class="btn btn-success btn-xs rounded-pill px-2">承認</button>
+                                            </form>
+                                            <form action="{{ url_for('quiz.admin_approve_bingo', square_id=s.square_id) }}" method="POST">
+                                                <input type="hidden" name="status" value="rejected">
+                                                <button type="submit" class="btn btn-danger btn-xs rounded-pill px-2">却下</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">現在、承認待ちの回答はありません。</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Betting & Teams Columns -->
+    <div class="col-lg-5">
+        <!-- Live Bet Status Card (Very important for MC) -->
+        <div class="glass-card shadow-lg p-4 rounded-4 border border-secondary mb-4">
+            <h3 class="h5 fw-bold text-white mb-3"><i class="bi bi-cash-coin text-primary me-2"></i>第2部 : ベット企画管理</h3>
+            
+            <div class="d-flex flex-column gap-3 mb-4">
+                {% for e in events %}
+                    <div class="card bg-dark border-secondary p-3 rounded-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="text-white fw-bold text-sm">{{ e.event_name }}</span>
+                                <span class="badge bg-secondary font-outfit text-3xs ms-1">{{ e.multiplier }}倍</span>
+                            </div>
+                            <div>
+                                {% if e.status == 'waiting' %}
+                                    <span class="badge bg-dark-50 text-muted border border-secondary rounded-pill text-2xs">待機中</span>
+                                {% elif e.status == 'betting' %}
+                                    <span class="badge bg-success-50 text-success border border-success-subtle rounded-pill text-2xs animate-pulse">ベット受付中</span>
+                                {% elif e.status == 'closed' %}
+                                    <span class="badge bg-warning-50 text-warning border border-warning-subtle rounded-pill text-2xs">結果判定待ち</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-50 text-white-50 rounded-pill text-2xs">清算完了</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 pt-2 border-top border-secondary">
+                            {% if e.status == 'waiting' %}
+                                <form action="{{ url_for('quiz.admin_set_event_status', event_id=e.event_id) }}" method="POST">
+                                    <input type="hidden" name="status" value="betting">
+                                    <button type="submit" class="btn btn-primary btn-xs rounded-pill px-3">
+                                        ベット開始
+                                    </button>
+                                </form>
+                            {% endif %}
+                            
+                            {% if e.status == 'betting' %}
+                                <form action="{{ url_for('quiz.admin_set_event_status', event_id=e.event_id) }}" method="POST">
+                                    <input type="hidden" name="status" value="closed">
+                                    <button type="submit" class="btn btn-warning btn-xs rounded-pill px-3">
+                                        受付締め切り
+                                    </button>
+                                </form>
+                            {% endif %}
+                            
+                            {% if e.status == 'closed' %}
+                                <div class="d-flex flex-wrap gap-2 align-items-center w-100 mt-2 justify-content-end">
+                                    <span class="text-xs text-white-50 me-2 w-100 text-end">正解判定:</span>
+                                    {% for opt in options_map[e.event_id] %}
+                                    <form action="{{ url_for('quiz.admin_settle_event', event_id=e.event_id) }}" method="POST">
+                                        <input type="hidden" name="winning_prediction" value="{{ opt.option_text }}">
+                                        <button type="submit" class="btn btn-success btn-xs rounded-pill px-3">{{ opt.option_text }}</button>
+                                    </form>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Active Bets Table (MC commentary tool) -->
+            {% if active_event %}
+                <h4 class="h6 fw-bold text-white mb-2"><i class="bi bi-list-columns-reverse me-1 text-accent"></i>現在集計中のベット (MC実況用)</h4>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 text-white-50 text-xs">
+                        <thead>
+                            <tr class="text-white border-secondary">
+                                <th>チーム</th>
+                                <th>予想</th>
+                                <th class="text-end">ベットpt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if bets %}
+                                {% for b in bets %}
+                                    <tr class="border-secondary">
+                                        <td class="fw-bold text-white">{{ team_map[b.team_id] }}</td>
+                                        <td><span class="badge bg-purple px-2 py-1">{{ b.prediction }}</span></td>
+                                        <td class="text-end text-accent fw-bold font-outfit">{{ b.bet_points }} pt</td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-3 text-muted">まだベットがありません。</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Teams Point adjustments -->
+        <div class="glass-card shadow-lg p-4 rounded-4 border border-secondary">
+            <h3 class="h5 fw-bold text-white mb-3"><i class="bi bi-people text-primary me-2"></i>チームスコア状況</h3>
+            
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 text-white-50 text-xs">
+                    <thead>
+                        <tr class="text-white border-secondary">
+                            <th>チーム名</th>
+                            <th class="text-end">現在の持ち点</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in teams %}
+                            <tr class="border-secondary">
+                                <td class="fw-bold text-white">{{ t.team_name }}</td>
+                                <td class="font-outfit fw-bold text-accent fs-6 text-end">
+                                    <span>{{ t.points }} pt</span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    socket.on('quiz_submitted', (data) => {
+        location.reload();
+    });
+
+    socket.on('bet_submitted', (data) => {
+        location.reload();
+    });
+
+    socket.on('bingo_submitted', (data) => {
+        location.reload();
+    });
+</script>
+{% endblock %}
