@@ -39,6 +39,11 @@ def index():
     return redirect(url_for("quiz.login"))
 
 
+@quiz_bp.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
+
 # Route: Login / Team Selection
 @quiz_bp.route("/login", methods=["GET", "POST"])
 def login():

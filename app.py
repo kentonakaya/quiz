@@ -1,10 +1,18 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
+import logging
 from flask import Flask
 from extensions import db, socketio
 from controller.controllers import quiz_bp
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
+    logger.info("Creating app...")
     # Set instance path explicitly to the directory where this file resides + /instance
     instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
     if not os.path.exists(instance_path):
@@ -34,16 +42,17 @@ def create_app() -> Flask:
         return dict(team_points=team_points)
 
     with app.app_context():
+        logger.info("Initializing database...")
         db.create_all()
+        logger.info("Seeding data...")
         seed_event_data()
+        logger.info("Startup complete.")
 
     return app
 
 
 def seed_event_data():
     from model.models import Team, QuizQuestion, BetEvent, BingoTheme, BetOption
-
-    print("Syncing quiz and betting database...")
 
     # 1. Sync Teams 1 to 20
     for i in range(1, 21):
@@ -75,7 +84,7 @@ def seed_event_data():
     quiz_data = [
         {
             "num": 1,
-            "text": "全社員が、Excelを使いながら最も「自社への愛」を感じる瞬間は、当然「Shiftキー」を押すときですよね。 では、Excelで「Shiftキーを押しながら、F11キー」を叩くと、一体何が起きるでしょう？",
+            "text": "全社員が、Excelを使いながら最も「自社への愛」を感じる瞬間は、当然「Shiftキー」を押すときですよね。 では、Excelで「Shiftキーを押しながら, F11キー」を叩くと、一体何が起きるでしょう？",
             "a": "無駄な工数の徹底的な削減",
             "b": "新たなフィールドの創出",
             "c": "自身の限界を超えるキャリアアップ",
@@ -189,11 +198,10 @@ def seed_event_data():
     for e_item in events_data:
         event = BetEvent.query.filter_by(event_name=e_item["name"]).first()
         if not event:
-            event = BetEvent(event_name=e_item["name"], multiplier=0.0) # multiplier column is deprecated
+            event = BetEvent(event_name=e_item["name"], multiplier=0.0)
             db.session.add(event)
-            db.session.flush() # Get event_id
+            db.session.flush()
         
-        # Sync Options
         existing_options = {opt.option_text: opt for opt in BetOption.query.filter_by(event_id=event.event_id).all()}
         for opt_text, mult in e_item["options"]:
             if opt_text in existing_options:
@@ -202,7 +210,7 @@ def seed_event_data():
                 db.session.add(BetOption(event_id=event.event_id, option_text=opt_text, multiplier=mult))
 
     db.session.commit()
-    print("Sync completed successfully.")
+    logger.info("Sync completed successfully.")
 
 
 app = create_app()
@@ -210,4 +218,4 @@ app = create_app()
 if __name__ == "__main__":
     socketio.run(
         app, debug=True, port=8080
-    )  # Using port 8080 to not conflict with the seat app
+    )
