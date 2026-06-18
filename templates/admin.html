@@ -79,7 +79,16 @@
 
         <!-- Bingo Approval Log -->
         <div class="glass-card shadow-lg p-4 rounded-4 border border-secondary">
-            <h3 class="h5 fw-bold text-white mb-3"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>ビンゴ回答承認待ち</h3>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h3 class="h5 fw-bold text-white mb-0"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>ビンゴ回答承認待ち</h3>
+                {% if pending_squares %}
+                <form action="{{ url_for('quiz.admin_approve_bingo_all') }}" method="POST" onsubmit="return confirm('すべての回答を一括承認しますか？');">
+                    <button type="submit" class="btn btn-outline-success btn-xs rounded-pill px-3">
+                        <i class="bi bi-check-all me-1"></i>全承認
+                    </button>
+                </form>
+                {% endif %}
+            </div>
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                 <table class="table table-dark table-hover align-middle mb-0 text-white-50 text-xs">
                     <thead>
@@ -92,9 +101,19 @@
                     </thead>
                     <tbody>
                         {% if pending_squares %}
+                            {% set current_team_id = [None] %}
                             {% for s in pending_squares %}
                                 <tr class="border-secondary">
-                                    <td class="fw-bold text-purple">{{ team_map[s.team_id] }}</td>
+                                    <td class="fw-bold text-purple">
+                                        {{ team_map[s.team_id] }}
+                                        {% if loop.first or s.team_id != pending_squares[loop.index0 - 1].team_id %}
+                                        <form action="{{ url_for('quiz.admin_approve_bingo_team', team_id=s.team_id) }}" method="POST" class="d-inline ms-1">
+                                            <button type="submit" class="btn btn-link btn-xs p-0 text-success text-decoration-none" title="このチームを全承認">
+                                                <i class="bi bi-check2-all"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
                                     <td class="text-white-50">#{{ s.position }}</td>
                                     <td class="text-white">「{{ s.content }}」</td>
                                     <td class="text-end">

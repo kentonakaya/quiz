@@ -57,7 +57,10 @@ class QuizQuestion(db.Model):
     choice_b = db.Column(db.String(255), nullable=False)
     choice_c = db.Column(db.String(255), nullable=False)
     choice_d = db.Column(db.String(255), nullable=False)
-    correct_choice = db.Column(db.String(1), nullable=False)  # 'A', 'B', 'C', 'D'
+    correct_choice = db.Column(db.String(4), nullable=False)  # e.g., 'A', 'BC', 'ACD'
+    is_multiple_choice = db.Column(
+        db.Boolean, default=False, nullable=False
+    )
     status = db.Column(
         db.String(20), default="hidden", nullable=False
     )  # 'hidden', 'active', 'revealed'
@@ -75,7 +78,7 @@ class QuizSubmission(db.Model):
     team_id = db.Column(
         db.Integer, db.ForeignKey("teams.team_id", ondelete="CASCADE"), nullable=False
     )
-    selected_choice = db.Column(db.String(1), nullable=False)  # 'A', 'B', 'C', 'D'
+    selected_choice = db.Column(db.String(10), nullable=False)  # e.g., 'A', 'B', or 'ABD'
     is_correct = db.Column(db.Boolean, default=False, nullable=False)
 
     __table_args__ = (

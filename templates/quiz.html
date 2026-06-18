@@ -26,28 +26,28 @@
                         
                         <div class="row g-3 text-start">
                             <div class="col-sm-6">
-                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('A')">
+                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('A', {{ 'true' if question.is_multiple_choice else 'false' }}, this)">
                                     <span class="choice-letter bg-primary text-white me-3">A</span>
                                     <span class="choice-text text-white-50">{{ question.choice_a }}</span>
                                 </button>
                             </div>
                             
                             <div class="col-sm-6">
-                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('B')">
+                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('B', {{ 'true' if question.is_multiple_choice else 'false' }}, this)">
                                     <span class="choice-letter bg-success text-white me-3">B</span>
                                     <span class="choice-text text-white-50">{{ question.choice_b }}</span>
                                 </button>
                             </div>
                             
                             <div class="col-sm-6">
-                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('C')">
+                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('C', {{ 'true' if question.is_multiple_choice else 'false' }}, this)">
                                     <span class="choice-letter bg-warning text-dark me-3">C</span>
                                     <span class="choice-text text-white-50">{{ question.choice_c }}</span>
                                 </button>
                             </div>
                             
                             <div class="col-sm-6">
-                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('D')">
+                                <button type="button" class="btn btn-outline-secondary choice-btn w-100 p-3 rounded-4 text-start d-flex align-items-center" onclick="selectChoice('D', {{ 'true' if question.is_multiple_choice else 'false' }}, this)">
                                     <span class="choice-letter bg-danger text-white me-3">D</span>
                                     <span class="choice-text text-white-50">{{ question.choice_d }}</span>
                                 </button>
@@ -69,10 +69,13 @@
                             <span class="text-white-50 text-xs">選択した回答:</span>
                             <span class="badge bg-purple px-3 py-2 rounded-pill font-outfit fs-6">
                                 {{ submitted.selected_choice }} : 
-                                {% if submitted.selected_choice == 'A' %}{{ question.choice_a }}
-                                {% elif submitted.selected_choice == 'B' %}{{ question.choice_b }}
-                                {% elif submitted.selected_choice == 'C' %}{{ question.choice_c }}
-                                {% else %}{{ question.choice_d }}{% endif %}
+                                {% for char in submitted.selected_choice %}
+                                    {% if char == 'A' %}{{ question.choice_a }}
+                                    {% elif char == 'B' %}{{ question.choice_b }}
+                                    {% elif char == 'C' %}{{ question.choice_c }}
+                                    {% elif char == 'D' %}{{ question.choice_d }}
+                                    {% endif %}{% if not loop.last %}, {% endif %}
+                                {% endfor %}
                             </span>
                         </div>
                     </div>
@@ -104,8 +107,13 @@
                     <div class="text-muted text-xs mt-0.5">アリーナ参加中</div>
                 </div>
                 <div class="text-end">
+                    {% if is_ranking_visible %}
                     <div class="text-white fw-bold font-outfit fs-3 text-gradient">{{ team_points }} <span class="text-accent text-xs">pt</span></div>
                     <div class="text-muted text-xs">現在の総得点</div>
+                    {% else %}
+                    <div class="text-white fw-bold font-outfit fs-4 text-gradient">LOCKED</div>
+                    <div class="text-muted text-xs">ランキング集計中</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -134,10 +142,13 @@
                         <span class="text-accent fw-bold me-1">正解は:</span> 
                         <strong class="text-white">
                             {{ last_revealed.correct_choice }} : 
-                            {% if last_revealed.correct_choice == 'A' %}{{ last_revealed.choice_a }}
-                            {% elif last_revealed.correct_choice == 'B' %}{{ last_revealed.choice_b }}
-                            {% elif last_revealed.correct_choice == 'C' %}{{ last_revealed.choice_c }}
-                            {% else %}{{ last_revealed.choice_d }}{% endif %}
+                            {% for char in last_revealed.correct_choice %}
+                                {% if char == 'A' %}{{ last_revealed.choice_a }}
+                                {% elif char == 'B' %}{{ last_revealed.choice_b }}
+                                {% elif char == 'C' %}{{ last_revealed.choice_c }}
+                                {% elif char == 'D' %}{{ last_revealed.choice_d }}
+                                {% endif %}{% if not loop.last %}, {% endif %}
+                            {% endfor %}
                         </strong>
                         {% if last_sub %}
                             <div class="mt-1.5 pt-1.5 border-top border-secondary text-2xs">
@@ -156,22 +167,35 @@
 
 {% block extra_js %}
 <script>
-    function selectChoice(letter) {
-        // Remove active class from all buttons
-        document.querySelectorAll('.choice-btn').forEach(btn => {
-            btn.classList.remove('active', 'border-primary', 'shadow-neon-small');
-            btn.querySelector('.choice-letter').classList.remove('bg-purple');
-        });
+    let selectedChoices = [];
+
+    function selectChoice(letter, isMultiple, element) {
+        if (!isMultiple) {
+            // Single selection mode
+            document.querySelectorAll('.choice-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-primary', 'shadow-neon-small');
+                btn.querySelector('.choice-letter').classList.remove('bg-purple');
+            });
+            element.classList.add('active', 'border-primary', 'shadow-neon-small');
+            document.getElementById('selectedChoice').value = letter;
+        } else {
+            // Multiple selection mode
+            if (element.classList.contains('active')) {
+                element.classList.remove('active', 'border-primary', 'shadow-neon-small');
+                selectedChoices = selectedChoices.filter(c => c !== letter);
+            } else {
+                element.classList.add('active', 'border-primary', 'shadow-neon-small');
+                selectedChoices.push(letter);
+            }
+            document.getElementById('selectedChoice').value = selectedChoices.join('');
+        }
         
-        // Add active style to selected button
-        const clickedBtn = event.currentTarget;
-        clickedBtn.classList.add('active', 'border-primary', 'shadow-neon-small');
-        
-        // Set value
-        document.getElementById('selectedChoice').value = letter;
-        
-        // Enable submit button
-        document.getElementById('submitBtn').removeAttribute('disabled');
+        // Enable submit button if at least one choice is selected
+        if (document.getElementById('selectedChoice').value.length > 0) {
+            document.getElementById('submitBtn').removeAttribute('disabled');
+        } else {
+            document.getElementById('submitBtn').setAttribute('disabled', 'true');
+        }
     }
 
     // MCの操作を反映するためにSocket.IOで通信

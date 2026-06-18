@@ -35,11 +35,26 @@ def create_app() -> Flask:
         from repository import repositories
 
         team_points = 0
+        is_ranking_visible = True
+        
+        # Check blackout condition
+        blackout_event_name = "【格付け③】箱の中身はなんだろな？（わっきー戦）"
+        events = repositories.get_all_events()
+        blackout_event = next((e for e in events if e.event_name == blackout_event_name), None)
+        
+        if blackout_event and blackout_event.status == "settled":
+            if not session.get("is_admin"):
+                is_ranking_visible = False
+
         if "team_id" in session:
             team = repositories.get_team_by_id(session["team_id"])
             if team:
                 team_points = team.points
-        return dict(team_points=team_points)
+        
+        return dict(
+            team_points=team_points, 
+            is_ranking_visible=is_ranking_visible
+        )
 
     with app.app_context():
         logger.info("Initializing database...")
@@ -90,6 +105,7 @@ def seed_event_data():
             "c": "自身の限界を超えるキャリアアップ",
             "d": "不具合の出ない完璧な品質保証",
             "correct": "B",
+            "is_multiple": False,
         },
         {
             "num": 2,
@@ -99,6 +115,7 @@ def seed_event_data():
             "c": "C",
             "d": "D",
             "correct": "A",
+            "is_multiple": False,
         },
         {
             "num": 3,
@@ -108,6 +125,7 @@ def seed_event_data():
             "c": "C",
             "d": "D",
             "correct": "B",
+            "is_multiple": False,
         },
         {
             "num": 4,
@@ -117,6 +135,7 @@ def seed_event_data():
             "c": "C",
             "d": "D",
             "correct": "A",
+            "is_multiple": False,
         },
         {
             "num": 5,
@@ -125,7 +144,8 @@ def seed_event_data():
             "b": "B",
             "c": "C",
             "d": "D",
-            "correct": "B",
+            "correct": "ACD",
+            "is_multiple": True,
         },
     ]
 
@@ -143,6 +163,7 @@ def seed_event_data():
             q.choice_c = q_item["c"]
             q.choice_d = q_item["d"]
             q.correct_choice = q_item["correct"]
+            q.is_multiple_choice = q_item["is_multiple"]
         else:
             db.session.add(
                 QuizQuestion(
@@ -153,6 +174,7 @@ def seed_event_data():
                     choice_c=q_item["c"],
                     choice_d=q_item["d"],
                     correct_choice=q_item["correct"],
+                    is_multiple_choice=q_item["is_multiple"],
                 )
             )
 

@@ -57,8 +57,17 @@ def login():
             return redirect(url_for("quiz.admin"))
         else:
             team_id = request.form.get("team_id", type=int)
+            team_name_suffix = request.form.get("team_name_suffix", "").strip()
             team = repositories.get_team_by_id(team_id)
             if team:
+                if team_name_suffix:
+                    import re
+                    match = re.search(r"(チーム\s*\d+)", team.team_name)
+                    prefix = match.group(1) if match else f"チーム {team.team_id}"
+                    team.team_name = f"{prefix} {team_name_suffix}"
+                    from extensions import db
+                    db.session.commit()
+
                 session.clear()
                 session["team_id"] = team.team_id
                 session["team_name"] = team.team_name
@@ -67,6 +76,44 @@ def login():
 
     teams = repositories.get_all_teams()
     return render_template("login.html", teams=teams)
+
+
+# Admin Action: Bulk Approve Bingo Squares
+@quiz_bp.route("/admin/bingo/approve_all", methods=["POST"])
+@admin_required
+def admin_approve_bingo_all():
+    pending = repositories.get_pending_bingo_squares()
+    count = 0
+    for s in pending:
+        success, _ = usecases.approve_bingo_square(s.square_id, "approved")
+        if success:
+            count += 1
+    
+    if count > 0:
+        socketio.emit("bingo_update", {}, namespace="/")
+        flash(f"{count} 件の回答を一括承認しました。", "success")
+    else:
+        flash("承認待ちの回答はありません。", "info")
+    return redirect(url_for("quiz.admin"))
+
+
+@quiz_bp.route("/admin/bingo/approve_team/<int:team_id>", methods=["POST"])
+@admin_required
+def admin_approve_bingo_team(team_id):
+    pending = repositories.get_bingo_squares_by_team(team_id)
+    count = 0
+    for s in pending:
+        if s.status == "pending":
+            success, _ = usecases.approve_bingo_square(s.square_id, "approved")
+            if success:
+                count += 1
+    
+    if count > 0:
+        socketio.emit("bingo_update", {}, namespace="/")
+        flash(f"チームの回答 {count} 件を一括承認しました。", "success")
+    else:
+        flash("このチームの承認待ち回答はありません。", "info")
+    return redirect(url_for("quiz.admin"))
 
 
 # Route: Logout

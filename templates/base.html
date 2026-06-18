@@ -67,7 +67,11 @@
                     <!-- Show team score dynamically in the header -->
                     <div class="points-badge px-3 py-1.5 rounded-pill d-flex align-items-center gap-2">
                         <span class="text-muted text-xs font-outfit">{{ session.get('team_name') }}</span>
+                        {% if is_ranking_visible %}
                         <span class="text-white fw-bold font-outfit" id="headerPoints">{{ team_points }} <span class="text-accent small">pt</span></span>
+                        {% else %}
+                        <span class="text-white fw-bold font-outfit" id="headerPoints">LOCKED</span>
+                        {% endif %}
                     </div>
                     {% else %}
                     <span class="badge bg-danger px-3 py-2 rounded-pill text-xs"><i class="bi bi-mic me-1"></i>MC・管理者</span>

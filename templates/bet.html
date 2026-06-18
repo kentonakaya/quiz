@@ -51,16 +51,23 @@
                                     <span class="input-group-text bg-secondary border-secondary text-white font-outfit fw-bold">pt</span>
                                 </div>
                                 <div class="d-flex justify-content-between mt-2 text-2xs text-muted">
+                                    {% if is_ranking_visible %}
                                     <span>現在の持ち点: {{ team_points }}pt</span>
                                     <span>最小 1pt / 最大 {{ team_points }}pt</span>
+                                    {% else %}
+                                    <span>現在の持ち点: LOCKED</span>
+                                    <span>最小 1pt / 最大 ??? pt</span>
+                                    {% endif %}
                                 </div>
                                 
                                 <!-- Quick Bet Buttons -->
                                 <div class="d-flex gap-2 mt-2">
                                     <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(100)">100pt</button>
                                     <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(500)">500pt</button>
+                                    {% if is_ranking_visible %}
                                     <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet(Math.floor({{ team_points }} / 2))">ハーフ</button>
                                     <button type="button" class="btn btn-dark btn-xs rounded-pill border border-secondary text-white-50" onclick="setQuickBet({{ team_points }})">全額</button>
+                                    {% endif %}
                                 </div>
                             </div>
                             

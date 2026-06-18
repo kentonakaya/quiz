@@ -13,16 +13,18 @@
             </div>
             
             <form action="{{ url_for('quiz.login') }}" method="POST">
-                <input type="hid 
-                den" name="role" id="loginRole" value="team">
+                <input type="hidden" name="role" id="loginRole" value="team">
                 
                 <div id="teamSelectGroup" class="mb-4 text-start">
                     <label for="team_id" class="form-label text-white-50 small"><i class="bi bi-people me-1"></i>あなたのチーム</label>
-                    <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5" id="team_id" name="team_id">
+                    <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5 mb-3" id="team_id" name="team_id">
                         {% for t in teams %}
                             <option value="{{ t.team_id }}">{{ t.team_name }}</option>
                         {% endfor %}
                     </select>
+                    
+                    <label for="team_name_suffix" class="form-label text-white-50 small"><i class="bi bi-pencil-square me-1"></i>チーム名（例: 最強チーム）</label>
+                    <input type="text" class="form-control bg-dark border-secondary text-white rounded-3 py-2.5" id="team_name_suffix" name="team_name_suffix" placeholder="チーム名を入力してください">
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100 rounded-pill py-2.5 fw-bold font-outfit mb-3 shadow-neon">

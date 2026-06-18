@@ -35,7 +35,7 @@ def submit_bingo_answer(team_id: int, position: int, content: str) -> tuple[bool
 
 
 def approve_bingo_square(
-    square_id: int, status: str, square_reward: int = 20, line_reward: int = 100
+    square_id: int, status: str, square_reward: int = 10, line_reward: int = 20
 ) -> tuple[bool, str]:
     """
     Called by admin to approve/reject a team's bingo square.
@@ -105,6 +105,10 @@ def submit_quiz_answer(
     if existing:
         return False, "この問題には既に回答を送信しています。"
 
+    # For multiple answers, sort the letters (e.g., "BCA" -> "ABC")
+    if selected_choice:
+        selected_choice = "".join(sorted(selected_choice.upper()))
+
     repositories.insert_submission(quiz_id, team_id, selected_choice)
     return True, "回答を送信しました！"
 
@@ -120,9 +124,12 @@ def reveal_quiz_answer(quiz_id: int, award_points: int = 100) -> tuple[bool, str
     # Gather submissions
     submissions = repositories.get_submissions_for_question(quiz_id)
 
+    # Correct choice should also be sorted for comparison
+    correct_sorted = "".join(sorted(q.correct_choice.upper()))
+
     # Check correctness and award points
     for s in submissions:
-        if s.selected_choice == q.correct_choice:
+        if s.selected_choice == correct_sorted:
             s.is_correct = True
             team = repositories.get_team_by_id(s.team_id)
             team.points += award_points
