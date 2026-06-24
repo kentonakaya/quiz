@@ -61,39 +61,43 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-8 text-center">
-        <!-- Title Header -->
         <div class="mb-4">
             <h2 class="h1 fw-bold text-white font-outfit text-gradient font-dela">LIVE RANKING</h2>
-            <p class="text-muted">栄光を掴むのはどのだ！？</p>
+            <p class="text-muted">栄光を掴むのはどのチームだ！？</p>
         </div>
         
         {% if is_ranking_visible %}
-            <!-- Podium for Top 3 -->
             {% if teams|length >= 3 %}
             <div class="podium-container d-none d-sm-flex">
-                <!-- 2nd Place -->
                 <div class="podium-item">
                     <div class="team-avatar"><i class="bi bi-people"></i></div>
-                    <div class="text-white-50 small mb-1">{{ teams[1].team_name }}</div>
+                    <div class="text-white-50 small mb-1">
+                        <span class="badge bg-secondary py-0.5 px-1.5 text-2xs me-1 font-outfit">チーム {{ teams[1].team_id }}</span>
+                        <strong>{{ teams[1].team_name }}</strong>
+                    </div>
                     <div class="podium-base podium-rank-2">
                         <span class="font-dela fs-3 text-white">2</span>
                         <span class="font-outfit fw-bold text-accent">{{ teams[1].points }}pt</span>
                     </div>
                 </div>
-                <!-- 1st Place -->
                 <div class="podium-item" style="width: 140px;">
                     <i class="bi bi-crown-fill crown animate-pulse"></i>
                     <div class="team-avatar" style="width: 80px; height: 80px; font-size: 2rem;"><i class="bi bi-fire text-gradient"></i></div>
-                    <div class="text-white fw-bold mb-1">{{ teams[0].team_name }}</div>
+                    <div class="text-white fw-bold mb-1">
+                        <span class="badge bg-warning text-dark py-0.5 px-1.5 text-2xs me-1 font-outfit">チーム {{ teams[0].team_id }}</span>
+                        <strong>{{ teams[0].team_name }}</strong>
+                    </div>
                     <div class="podium-base podium-rank-1">
                         <span class="font-dela fs-1 text-white">1</span>
                         <span class="font-outfit fw-bold text-accent fs-4">{{ teams[0].points }}pt</span>
                     </div>
                 </div>
-                <!-- 3rd Place -->
                 <div class="podium-item">
                     <div class="team-avatar"><i class="bi bi-people"></i></div>
-                    <div class="text-white-50 small mb-1">{{ teams[2].team_name }}</div>
+                    <div class="text-white-50 small mb-1">
+                        <span class="badge bg-secondary py-0.5 px-1.5 text-2xs me-1 font-outfit">チーム {{ teams[2].team_id }}</span>
+                        <strong>{{ teams[2].team_name }}</strong>
+                    </div>
                     <div class="podium-base podium-rank-3">
                         <span class="font-dela fs-4 text-white">3</span>
                         <span class="font-outfit fw-bold text-accent">{{ teams[2].points }}pt</span>
@@ -102,7 +106,6 @@
             </div>
             {% endif %}
 
-            <!-- Full List -->
             <div class="glass-card shadow-lg p-4 rounded-5 border border-secondary text-start mt-4">
                 <div class="d-flex flex-column gap-3">
                     {% for team in teams %}
@@ -123,10 +126,14 @@
                                     {{ rank }}
                                 </div>
                                 
-                                <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-dark border border-secondary text-white-50 font-outfit px-2 py-1 text-xs">
+                                        チーム {{ team.team_id }}
+                                    </span>
                                     <span class="team-name text-white fw-bold fs-5 font-outfit">{{ team.team_name }}</span>
+                                    
                                     {% if rank == 1 %}
-                                        <span class="ms-2 text-warning text-2xs animate-pulse"><i class="bi bi-stars me-0.5"></i>TOP</span>
+                                        <span class="ms-1 text-warning text-2xs animate-pulse"><i class="bi bi-stars me-0.5"></i>TOP</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -140,7 +147,6 @@
                 </div>
             </div>
         {% else %}
-            <!-- Blackout State -->
             <div class="glass-card shadow-lg p-5 rounded-5 border border-secondary text-center mt-5">
                 <div class="mb-4">
                     <i class="bi bi-eye-slash text-gradient display-1 mb-2 d-inline-block"></i>
@@ -161,4 +167,3 @@
     </div>
 </div>
 {% endblock %}
-

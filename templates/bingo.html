@@ -46,7 +46,7 @@
         background: linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(217, 70, 239, 0.25) 100%);
         border: 2px solid var(--accent-purple);
         box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
-        cursor: not-allowed; /* タップ不可のカーソル */
+        cursor: not-allowed;
     }
     .bingo-cell.rejected {
         background: rgba(220, 53, 69, 0.1);
@@ -76,6 +76,7 @@
         color: var(--accent-cyan);
         margin-top: 4px;
         font-weight: 500;
+        word-break: break-all;
     }
 </style>
 {% endblock %}
@@ -102,14 +103,12 @@
                     {% set square = square_map.get(theme.position) %}
                     
                     {% if theme.position == 5 %}
-                        <!-- 真ん中（#5）は最初からFREEマス（タップ不可） -->
                         <div class="bingo-cell free-cell">
                             <span class="theme-text text-warning">#5 FREE</span>
                             <span class="content-text text-white font-outfit fw-black tracking-widest">★ FREE ★</span>
                             <span class="badge bg-purple mt-2" style="font-size: 0.6rem;">解放済</span>
                         </div>
                     {% else %}
-                        <!-- 通常のマス（タップ可能） -->
                         <div class="bingo-cell {% if square %}{{ square.status }}{% else %}empty{% endif %}" 
                              {% if not square or square.status != 'approved' %}
                                  data-bs-toggle="modal" data-bs-target="#submitModal" 
@@ -120,8 +119,14 @@
                             <span class="theme-text">#{{ theme.position }} {{ theme.theme_text }}</span>
                             
                             {% if square %}
-                                <!-- 既存の投稿内容（共通点と名前をパースして表示、または一括表示） -->
-                                <span class="content-text">{{ square.content }}</span>
+                                {% if '（' in square.content and '）' in square.content %}
+                                    {% set parts = square.content.split('（') %}
+                                    <span class="content-text text-white">{{ parts[0] }}</span>
+                                    <span class="names-text"><i class="bi bi-people-fill me-0.5"></i>{{ parts[1].replace('）', '') }}</span>
+                                {% else %}
+                                    <span class="content-text text-white">{{ square.content }}</span>
+                                {% endif %}
+
                                 <span class="badge {% if square.status == 'approved' %}bg-success{% elif square.status == 'pending' %}bg-warning text-dark{% else %}bg-danger{% endif %} mt-2" style="font-size: 0.6rem;">
                                     {% if square.status == 'approved' %}承認済{% elif square.status == 'pending' %}承認待ち{% else %}再提出{% endif %}
                                 </span>
@@ -145,7 +150,6 @@
     </div>
 </div>
 
-<!-- Submit Modal -->
 <div class="modal fade" id="submitModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark border-secondary rounded-4">
@@ -179,7 +183,6 @@
                         </div>
                     </div>
 
-                    <!-- 最終的にバックエンドの db に送る用の隠し input -->
                     <input type="hidden" name="content" id="finalContent">
                 </div>
                 <div class="modal-footer border-secondary">
@@ -211,10 +214,9 @@
             modalPosition.value = position;
             modalThemeText.textContent = `#${position} ${theme}`;
             
-            // すでに再提出などで値が入っている場合のパース処理（形式: "共通点（名前1 & 名前2）"）
             if (rawContent && rawContent.includes('（') && rawContent.includes(' & ')) {
                 const parts = rawContent.split('（');
-                modalContentInput.value = parts[0].strip();
+                modalContentInput.value = parts[0].trim();
                 const names = parts[1].replace('）', '').split(' & ');
                 modalName1.value = names[0] ? names[0].trim() : '';
                 modalName2.value = names[1] ? names[1].trim() : '';
@@ -226,7 +228,6 @@
         });
     }
 
-    // 送信時に共通点と2人の名前を「共通点（名前1 & 名前2）」という文字列に結合して送信する
     document.getElementById('bingoSubmitForm')?.addEventListener('submit', function(e) {
         const contentVal = document.getElementById('modalContentInput').value.trim();
         const name1Val = document.getElementById('modalName1').value.trim();

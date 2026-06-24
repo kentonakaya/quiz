@@ -34,11 +34,9 @@ def admin_required(f):
 # 全テンプレートに状態フラグを自動注入
 @quiz_bp.context_processor
 def inject_game_status():
-    # Q1が一度でも active または revealed になったかを判定（＝企画開始されたか）
     q1 = QuizQuestion.query.filter_by(question_num=1).first()
     is_q1_activated = q1.status in ["active", "revealed"] if q1 else False
 
-    # Q5が正解発表されたか
     q5 = QuizQuestion.query.filter_by(question_num=5).first()
     is_q5_revealed = q5.status == "revealed" if q5 else False
 
@@ -81,10 +79,10 @@ def login():
             team_name_suffix = request.form.get("team_name_suffix", "").strip()
             team = repositories.get_team_by_id(team_id)
             if team:
+                # ユーザーがテキストボックスに入力した文字列がある場合
                 if team_name_suffix:
-                    match = re.search(r"(チーム\s*\d+)", team.team_name)
-                    prefix = match.group(1) if match else f"チーム {team.team_id}"
-                    team.team_name = f"{prefix} {team_name_suffix}"
+                    # 「チーム X」を付けず、入力された文字列そのものをそのままチーム名にする
+                    team.team_name = team_name_suffix
                     db.session.commit()
 
                 session.clear()

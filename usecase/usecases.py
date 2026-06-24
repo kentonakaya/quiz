@@ -169,7 +169,7 @@ def place_bet(
 
     return (
         True,
-        f"{bet_points}pt を賭けて予想「{prediction}」({multiplier}倍) でベット完了しました！",
+        f"{bet_points}pt を賭けて予想「{prediction}」でベット完了しました！",
     )
 
 

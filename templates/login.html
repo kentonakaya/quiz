@@ -19,12 +19,12 @@
                     <label for="team_id" class="form-label text-white-50 small"><i class="bi bi-people me-1"></i>あなたのチーム</label>
                     <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5 mb-3" id="team_id" name="team_id" onchange="updateTeamNameInput()">
                         {% for t in teams %}
-                            <option value="{{ t.team_id }}" data-custom-name="{{ t.team_name }}">チーム {{ loop.index }}</option>
+                            <option value="{{ t.team_id }}" data-custom-name="{{ t.team_name }}">チーム {{ loop.index }}（名前: {{ t.team_name }}）</option>
                         {% endfor %}
                     </select>
                     
                     <label for="team_name_suffix" class="form-label text-white-50 small"><i class="bi bi-pencil-square me-1"></i>チーム名（例: ガジャイル推進部）</label>
-                    <input type="text" class="form-control bg-dark border-secondary text-white rounded-3 py-2.5" id="team_name_suffix" name="team_name_suffix" placeholder="チーム名を入力してください">
+                    <input type="text" class="form-control bg-dark border-secondary text-white rounded-3 py-2.5" id="team_name_suffix" name="team_name_suffix" placeholder="チーム名を入力または修正してください">
                 </div>
 
                 <div id="adminPasswordGroup" class="mb-4 text-start" style="display: none;">
@@ -49,19 +49,28 @@
 
 {% block extra_js %}
 <script>
-    // 選択されたチームの現在のチーム名をテキストボックスに反映させる関数
+    // プルダウン選択時にテキストボックスへチーム名を流し込む関数（最適化版）
     function updateTeamNameInput() {
         const select = document.getElementById('team_id');
+        if (!select || select.selectedIndex === -1) return;
+        
         const selectedOption = select.options[select.selectedIndex];
-        const customName = selectedOption.getAttribute('data-custom-name');
+        let customName = selectedOption.getAttribute('data-custom-name') || '';
         const nameInput = document.getElementById('team_name_suffix');
         
-        // デフォルトの「チーム X」のまま、あるいは空でなければ、その名前をセット。そうでなければ空にする
-        if (customName && !customName.startsWith('チーム ')) {
-            nameInput.value = customName;
-        } else {
-            nameInput.value = '';
+        if (!nameInput) return;
+
+        // 「チーム 1」「チーム1」のように、後ろに何もカスタム名がついていない初期状態のテキストは除外する
+        // 例: 「チーム 3 爆速エンジニア」なら「爆速エンジニア」の部分だけを取り出す
+        const defaultPattern = /^チーム\s*\d+\s*/;
+        
+        if (defaultPattern.test(customName)) {
+            // 初期文言（チーム X）を削って後ろのカスタム名だけを残す
+            customName = customName.replace(defaultPattern, '').trim();
         }
+        
+        // テキストボックスに値をセット（もちろんユーザーが自由に書き換え可能）
+        nameInput.value = customName;
     }
 
     function toggleAdminMode() {
@@ -86,7 +95,7 @@
         }
     }
 
-    // ページ読み込み時に最初のチーム名を初期セット
+    // ページロード時に、初期選択されているチームの名前を自動セット
     document.addEventListener('DOMContentLoaded', function() {
         updateTeamNameInput();
     });
