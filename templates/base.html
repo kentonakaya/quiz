@@ -17,7 +17,13 @@
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('quiz.index') }}">
                 <i class="bi bi-fire text-gradient fs-4 me-2"></i>
-                <span class="brand-text">TOPGUN10<span class="text-accent text-gradient font-dela ms-1">バトル</span></span>
+                <span class="brand-text">
+                    {% if is_q1_activated %}
+                        TOPGUN10<span class="text-accent text-gradient font-dela ms-1">バトル</span>
+                    {% else %}
+                        ？？？？？？<span class="text-accent text-gradient font-dela ms-1">？？？</span>
+                    {% endif %}
+                </span>
             </a>
             
             {% if session.get('team_id') or session.get('is_admin') %}
