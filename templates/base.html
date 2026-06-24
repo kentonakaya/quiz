@@ -4,20 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}新卒交流会クイズ＆ベット{% endblock %}</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@400;500;700&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
-    <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg sticky-top navbar-dark">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('quiz.index') }}">
@@ -34,17 +29,17 @@
                     {% if not session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'quiz.bingo' %}active{% endif %}" href="{{ url_for('quiz.bingo') }}">
-                            <i class="bi bi-grid-3x3-gap me-1"></i>ビンゴ共通点
+                            <i class="bi bi-grid-3x3-gap me-1"></i>Mind SHIFT BINGO
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'quiz.quiz_view' %}active{% endif %}" href="{{ url_for('quiz.quiz_view') }}">
-                            <i class="bi bi-trophy me-1"></i>4択クイズ
+                            <i class="bi bi-trophy me-1"></i>{% if is_q1_activated %}クイズ企画{% else %}？？？？{% endif %}
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'quiz.bet_view' %}active{% endif %}" href="{{ url_for('quiz.bet_view') }}">
-                            <i class="bi bi-cash-coin me-1"></i>{% if is_q5_revealed %}ベット企画{% else %}？？？？{% endif %}
+                            <i class="bi bi-cash-coin me-1"></i>{% if is_q5_revealed %}TD企画{% else %}？？？？{% endif %}
                         </a>
                     </li>
                     {% endif %}
@@ -64,7 +59,6 @@
                 
                 <div class="d-flex align-items-center gap-3">
                     {% if not session.get('is_admin') %}
-                    <!-- Show team score dynamically in the header -->
                     <div class="points-badge px-3 py-1.5 rounded-pill d-flex align-items-center gap-2">
                         <span class="text-muted text-xs font-outfit">{{ session.get('team_name') }}</span>
                         {% if is_ranking_visible %}
@@ -85,9 +79,7 @@
         </div>
     </nav>
 
-    <!-- Main Container -->
     <main class="container my-5 flex-grow-1">
-        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="row mb-4">
@@ -112,20 +104,16 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Content Block -->
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
     <footer class="footer mt-auto py-3">
         <div class="container text-center text-muted">
             <span class="text-xs">&copy; 2026 歴代新卒交流会 実行委員会. All rights reserved.</span>
         </div>
     </footer>
 
-    <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- SocketIO Client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         const socket = io();
@@ -145,7 +133,6 @@
         });
 
         socket.on('quiz_update', (data) => {
-            // クイズ情報が更新(公開・正解発表など)されたらヘッダーメニューなどの文言を連動させるためリロード
             location.reload();
         });
     </script>

@@ -31,12 +31,18 @@ def admin_required(f):
     return decorated_function
 
 
-# 全テンプレートにQ5の正解発表状態を自動注入する
+# 全テンプレートに状態フラグを自動注入
 @quiz_bp.context_processor
-def inject_q5_status():
+def inject_game_status():
+    # Q1が一度でも active または revealed になったかを判定（＝企画開始されたか）
+    q1 = QuizQuestion.query.filter_by(question_num=1).first()
+    is_q1_activated = q1.status in ["active", "revealed"] if q1 else False
+
+    # Q5が正解発表されたか
     q5 = QuizQuestion.query.filter_by(question_num=5).first()
     is_q5_revealed = q5.status == "revealed" if q5 else False
-    return dict(is_q5_revealed=is_q5_revealed)
+
+    return dict(is_q1_activated=is_q1_activated, is_q5_revealed=is_q5_revealed)
 
 
 # Route: Index Redirect
