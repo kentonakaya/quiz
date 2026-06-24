@@ -1,8 +1,10 @@
+import re
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from functools import wraps
 from usecase import usecases
 from repository import repositories
 from extensions import db, socketio
+from model.models import QuizQuestion, QuizSubmission, TeamBet, BingoSquare, Team
 
 quiz_bp = Blueprint("quiz", __name__)
 
@@ -29,6 +31,14 @@ def admin_required(f):
     return decorated_function
 
 
+# 全テンプレートにQ5の正解発表状態を自動注入する
+@quiz_bp.context_processor
+def inject_q5_status():
+    q5 = QuizQuestion.query.filter_by(question_num=5).first()
+    is_q5_revealed = q5.status == "revealed" if q5 else False
+    return dict(is_q5_revealed=is_q5_revealed)
+
+
 # Route: Index Redirect
 @quiz_bp.route("/", methods=["GET"])
 def index():
@@ -50,7 +60,6 @@ def login():
     if request.method == "POST":
         role = request.form.get("role")
         if role == "admin":
-            # 管理者パスワードの検証を追加
             admin_password = request.form.get("admin_password")
             if admin_password != "admin":
                 flash("管理者パスワードが正しくありません。", "danger")
@@ -67,13 +76,9 @@ def login():
             team = repositories.get_team_by_id(team_id)
             if team:
                 if team_name_suffix:
-                    import re
-
                     match = re.search(r"(チーム\s*\d+)", team.team_name)
                     prefix = match.group(1) if match else f"チーム {team.team_id}"
                     team.team_name = f"{prefix} {team_name_suffix}"
-                    from extensions import db
-
                     db.session.commit()
 
                 session.clear()
@@ -161,9 +166,7 @@ def bingo():
     if team_id:
         squares = repositories.get_bingo_squares_by_team(team_id)
 
-    # Map squares by position for easy lookup in template
     square_map = {s.position: s for s in squares}
-
     return render_template("bingo.html", themes=themes, square_map=square_map)
 
 
@@ -193,7 +196,6 @@ def quiz_view():
             flash(message, "danger")
         return redirect(url_for("quiz.quiz_view"))
 
-    # GET: Fetch active question
     active_q = repositories.get_active_question()
     submitted = None
 
@@ -202,7 +204,6 @@ def quiz_view():
             active_q.quiz_id, team_id
         )
 
-    # Fetch last revealed question for summary
     last_revealed = repositories.get_last_revealed_question()
     last_sub = None
     if last_revealed and team_id:
@@ -249,7 +250,6 @@ def bet_view():
             flash(message, "danger")
         return redirect(url_for("quiz.bet_view"))
 
-    # GET: Load betting interface
     active_event = repositories.get_active_bet_event()
     submitted_bet = None
     options = []
@@ -261,18 +261,11 @@ def bet_view():
                 active_event.event_id, team_id
             )
 
-    # Check if Q5 is revealed for event name masking
-    from model.models import QuizQuestion
-
-    q5 = QuizQuestion.query.filter_by(question_num=5).first()
-    is_q5_revealed = q5.status == "revealed" if q5 else False
-
     return render_template(
         "bet.html",
         event=active_event,
         submitted_bet=submitted_bet,
         options=options,
-        is_q5_revealed=is_q5_revealed,
     )
 
 
@@ -293,13 +286,11 @@ def admin():
     pending_squares = repositories.get_pending_bingo_squares()
     themes = repositories.get_all_bingo_themes()
 
-    # Check if there's any active bet event to show bets table
     active_event = repositories.get_active_bet_event()
     bets = []
     if active_event:
         bets = repositories.get_bets_for_event(active_event.event_id)
 
-    # Create a map of options for all events to support settlement buttons
     options_map = {}
     for e in events:
         options_map[e.event_id] = repositories.get_options_for_event(e.event_id)
@@ -324,7 +315,7 @@ def admin():
 @quiz_bp.route("/admin/bingo/<int:square_id>/approve", methods=["POST"])
 @admin_required
 def admin_approve_bingo(square_id: int):
-    status = request.form.get("status")  # 'approved' or 'rejected'
+    status = request.form.get("status")
     success, message = usecases.approve_bingo_square(square_id, status)
     if success:
         socketio.emit(
@@ -340,7 +331,6 @@ def admin_approve_bingo(square_id: int):
 @quiz_bp.route("/admin/quiz/<int:quiz_id>/activate", methods=["POST"])
 @admin_required
 def admin_activate_quiz(quiz_id: int):
-    # Hide all other active quizzes first
     active = repositories.get_active_question()
     if active:
         repositories.update_question_status(active.quiz_id, "hidden")
@@ -387,7 +377,7 @@ def admin_set_event_status(event_id: int):
     return redirect(url_for("quiz.admin"))
 
 
-# Admin Action: Settle Payout for Bet Event (格付け①専用ロジック内蔵)
+# Admin Action: Settle Payout for Bet Event
 @quiz_bp.route("/admin/event/<int:event_id>/settle", methods=["POST"])
 @admin_required
 def admin_settle_event(event_id: int):
@@ -396,14 +386,10 @@ def admin_settle_event(event_id: int):
         flash("イベントが見つかりません。", "danger")
         return redirect(url_for("quiz.admin"))
 
-    # 【格付け①】専用の自動合致数集計・配点清算ロジック
     if "格付け①" in event.event_name:
         try:
-            from model.models import TeamBet, Team
-
             bets = repositories.get_bets_for_event(event_id)
 
-            # 管理者が画面から送信した、実際の「真の正解レシピ」を受け取る
             correct_map = {
                 "赤色": request.form.get("flavor_red", "巨峰").strip(),
                 "青色": request.form.get("flavor_blue", "イチゴ").strip(),
@@ -412,7 +398,6 @@ def admin_settle_event(event_id: int):
             }
 
             for bet in bets:
-                # チームの予測データ形式: "赤色:巨峰, 青色:イチゴ..."
                 pred_text = bet.prediction or ""
                 correct_count = 0
 
@@ -422,7 +407,6 @@ def admin_settle_event(event_id: int):
                     if color in correct_map and flavor == correct_map[color]:
                         correct_count += 1
 
-                # 何問合致したかによって、ポイント配点の倍率が変動する
                 if correct_count == 0:
                     current_mult = 0.0
                     bet.status = "lost"
@@ -432,11 +416,10 @@ def admin_settle_event(event_id: int):
                 elif correct_count == 2:
                     current_mult = 1.2
                     bet.status = "won"
-                else:  # 3問または4問(全問)合致
+                else:
                     current_mult = 1.5
                     bet.status = "won"
 
-                # ポイントを自動払い戻し
                 if current_mult > 0:
                     team = repositories.get_team_by_id(bet.team_id)
                     payout = int(bet.bet_points * current_mult)
@@ -458,7 +441,6 @@ def admin_settle_event(event_id: int):
             flash(f"清算エラー: {str(e)}", "danger")
 
     else:
-        # 格付け②・③（通常の選択肢一選択方式）の清算
         winning_prediction = request.form.get("winning_prediction")
         success, message = usecases.settle_bet_event(event_id, winning_prediction)
         if success:
@@ -479,8 +461,6 @@ def admin_settle_event(event_id: int):
 @admin_required
 def admin_reset():
     try:
-        from model.models import QuizSubmission, TeamBet, BingoSquare, Team
-
         QuizSubmission.query.delete()
         TeamBet.query.delete()
         BingoSquare.query.delete()

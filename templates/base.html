@@ -44,7 +44,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'quiz.bet_view' %}active{% endif %}" href="{{ url_for('quiz.bet_view') }}">
-                            <i class="bi bi-cash-coin me-1"></i>ベット企画
+                            <i class="bi bi-cash-coin me-1"></i>{% if is_q5_revealed %}ベット企画{% else %}？？？？{% endif %}
                         </a>
                     </li>
                     {% endif %}
@@ -135,18 +135,18 @@
         });
 
         socket.on('points_update', (data) => {
-            // If the ranking page is open, reload it
             if (window.location.pathname.includes('/ranking')) {
                 location.reload();
             }
-            // Update header points if it matches the team
             const headerPoints = document.getElementById('headerPoints');
             if (headerPoints) {
-                // We don't necessarily know which team the points belong to from the event 
-                // unless we check session. But it's safer to just reload or fetch new points.
-                // For simplicity, let's reload if it's a point update.
                 location.reload();
             }
+        });
+
+        socket.on('quiz_update', (data) => {
+            // クイズ情報が更新(公開・正解発表など)されたらヘッダーメニューなどの文言を連動させるためリロード
+            location.reload();
         });
     </script>
     {% block extra_js %}{% endblock %}
