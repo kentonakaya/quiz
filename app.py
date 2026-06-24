@@ -1,4 +1,5 @@
 import eventlet
+
 eventlet.monkey_patch()
 
 import os
@@ -11,9 +12,10 @@ from controller.controllers import quiz_bp
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def create_app() -> Flask:
     logger.info("Creating app...")
-    # Set instance path explicitly to the directory where this file resides + /instance
+
     instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
     if not os.path.exists(instance_path):
         os.makedirs(instance_path)
@@ -33,15 +35,24 @@ def create_app() -> Flask:
     def inject_team_points():
         from flask import session
         from repository import repositories
+        from model.models import QuizQuestion
 
         team_points = 0
         is_ranking_visible = True
-        
-        # Check blackout condition
+
+        total_quizzes = QuizQuestion.query.count()
+        revealed_quizzes = QuizQuestion.query.filter_by(status="revealed").count()
+        is_bet_visible = revealed_quizzes >= 5
+
+        if session.get("is_admin"):
+            is_bet_visible = True
+
         blackout_event_name = "【格付け③】箱の中身はなんだろな？（わっきー戦）"
         events = repositories.get_all_events()
-        blackout_event = next((e for e in events if e.event_name == blackout_event_name), None)
-        
+        blackout_event = next(
+            (e for e in events if e.event_name == blackout_event_name), None
+        )
+
         if blackout_event and blackout_event.status == "settled":
             if not session.get("is_admin"):
                 is_ranking_visible = False
@@ -50,39 +61,39 @@ def create_app() -> Flask:
             team = repositories.get_team_by_id(session["team_id"])
             if team:
                 team_points = team.points
-        
-        return dict(
-            team_points=team_points, 
-            is_ranking_visible=is_ranking_visible
-        )
 
-    with app.app_context():
-        logger.info("Initializing database...")
-        db.create_all()
-        logger.info("Seeding data...")
-        seed_event_data()
-        logger.info("Startup complete.")
+        return dict(
+            team_points=team_points,
+            is_ranking_visible=is_ranking_visible,
+            is_bet_visible=is_bet_visible,
+        )
 
     return app
 
 
 def seed_event_data():
-    from model.models import Team, QuizQuestion, BetEvent, BingoTheme, BetOption
+    from model.models import (
+        Team,
+        QuizQuestion,
+        BetEvent,
+        BingoTheme,
+        BetOption,
+        BingoSquare,
+    )
 
-    # 1. Sync Teams 1 to 20
+    # 1. Sync Teams 1 to 20 by ID
     for i in range(1, 21):
-        team_name = f"チーム {i}"
-        team = Team.query.filter_by(team_name=team_name).first()
+        team = Team.query.get(i)
         if not team:
-            db.session.add(Team(team_name=team_name, points=500))
+            db.session.add(Team(team_id=i, team_name=f"チーム {i}", points=500))
 
-    # 2. Sync 9 Bingo Themes (3x3 grid)
+    # 2. Sync 9 Bingo Themes
     bingo_themes_data = [
         "血液型が同じ人がいる",
         "出身地方が同じ人がいる",
         "趣味が似ている人がいる",
         "好きな食べ物が同じ",
-        "休日の過ごし方が同じ",
+        "FREE (真ん中)",
         "持っている資格が同じ",
         "学生時代の部活が同じ",
         "最近買った高いものが同じ",
@@ -94,6 +105,14 @@ def seed_event_data():
             theme.theme_text = text
         else:
             db.session.add(BingoTheme(position=i, theme_text=text))
+
+    db.session.flush()
+    for i in range(1, 21):
+        free_square = BingoSquare.query.filter_by(team_id=i, position=5).first()
+        if not free_square:
+            db.session.add(
+                BingoSquare(team_id=i, position=5, content="★FREE★", status="approved")
+            )
 
     # 3. Sync Quiz Questions
     quiz_data = [
@@ -109,27 +128,27 @@ def seed_event_data():
         },
         {
             "num": 2,
-            "text": "パワポ（一期一会？）",
-            "a": "A",
-            "b": "B",
-            "c": "C",
-            "d": "D",
+            "text": "伏せたところに入る言葉は？",
+            "a": "運命の恋人に出会う",
+            "b": "隕石が衝突してくる",
+            "c": "流れ星を捕まえる",
+            "d": "丹下さんができないと言う",
             "correct": "A",
             "is_multiple": False,
         },
         {
             "num": 3,
-            "text": "テスト設計（聖徳太子クイズ？）",
-            "a": "A",
-            "b": "B",
-            "c": "C",
-            "d": "D",
+            "text": "この中に含まれていない曲は？",
+            "a": "天体観測",
+            "b": "好きすぎて滅!",
+            "c": "怪獣の花唄",
+            "d": "立ち上がリーヨ",
             "correct": "B",
             "is_multiple": False,
         },
         {
             "num": 4,
-            "text": "生成AI 1(顔合成)",
+            "text": "顔合成クイズ",
             "a": "A",
             "b": "B",
             "c": "C",
@@ -139,11 +158,11 @@ def seed_event_data():
         },
         {
             "num": 5,
-            "text": "生成AI 2（まんぷくんシルエット）",
-            "a": "A",
-            "b": "B",
-            "c": "C",
-            "d": "D",
+            "text": "この中でまんぷくんはどれ？",
+            "a": "左上",
+            "b": "右上",
+            "c": "左下",
+            "d": "右下",
             "correct": "ACD",
             "is_multiple": True,
         },
@@ -178,15 +197,15 @@ def seed_event_data():
                 )
             )
 
-    # 4. Sync Bet Events
+    # 4. Sync Bet Events (格付け①のルールと倍率を更新)
     events_data = [
         {
-            "name": "【格付け①】ハイチュウの味を何人当てられるか？",
+            "name": "【格付け①】ハイチュウの味を何問当てられるか？",
             "options": [
-                ("0〜1問 or 絶対アカン", 0.0),
-                ("2問正解", 1.0),
-                ("3問正解", 2.0),
-                ("4問すべて正解", 3.5),
+                ("0問正解", 0.0),
+                ("1問正解", 0.8),
+                ("2問正解", 1.2),
+                ("全問正解", 1.5),
             ],
         },
         {
@@ -223,13 +242,20 @@ def seed_event_data():
             event = BetEvent(event_name=e_item["name"], multiplier=0.0)
             db.session.add(event)
             db.session.flush()
-        
-        existing_options = {opt.option_text: opt for opt in BetOption.query.filter_by(event_id=event.event_id).all()}
+
+        existing_options = {
+            opt.option_text: opt
+            for opt in BetOption.query.filter_by(event_id=event.event_id).all()
+        }
         for opt_text, mult in e_item["options"]:
             if opt_text in existing_options:
                 existing_options[opt_text].multiplier = mult
             else:
-                db.session.add(BetOption(event_id=event.event_id, option_text=opt_text, multiplier=mult))
+                db.session.add(
+                    BetOption(
+                        event_id=event.event_id, option_text=opt_text, multiplier=mult
+                    )
+                )
 
     db.session.commit()
     logger.info("Sync completed successfully.")
@@ -238,6 +264,6 @@ def seed_event_data():
 app = create_app()
 
 if __name__ == "__main__":
-    socketio.run(
-        app, debug=True, port=8080
-    )
+    with app.app_context():
+        seed_event_data()
+    socketio.run(app, debug=True, port=8080)

@@ -50,6 +50,12 @@ def login():
     if request.method == "POST":
         role = request.form.get("role")
         if role == "admin":
+            # 管理者パスワードの検証を追加
+            admin_password = request.form.get("admin_password")
+            if admin_password != "admin":
+                flash("管理者パスワードが正しくありません。", "danger")
+                return redirect(url_for("quiz.login"))
+
             session.clear()
             session["is_admin"] = True
             session["name"] = "管理者"
@@ -62,10 +68,12 @@ def login():
             if team:
                 if team_name_suffix:
                     import re
+
                     match = re.search(r"(チーム\s*\d+)", team.team_name)
                     prefix = match.group(1) if match else f"チーム {team.team_id}"
                     team.team_name = f"{prefix} {team_name_suffix}"
                     from extensions import db
+
                     db.session.commit()
 
                 session.clear()
@@ -88,7 +96,7 @@ def admin_approve_bingo_all():
         success, _ = usecases.approve_bingo_square(s.square_id, "approved")
         if success:
             count += 1
-    
+
     if count > 0:
         socketio.emit("bingo_update", {}, namespace="/")
         flash(f"{count} 件の回答を一括承認しました。", "success")
@@ -107,7 +115,7 @@ def admin_approve_bingo_team(team_id):
             success, _ = usecases.approve_bingo_square(s.square_id, "approved")
             if success:
                 count += 1
-    
+
     if count > 0:
         socketio.emit("bingo_update", {}, namespace="/")
         flash(f"チームの回答 {count} 件を一括承認しました。", "success")
@@ -253,11 +261,18 @@ def bet_view():
                 active_event.event_id, team_id
             )
 
+    # Check if Q5 is revealed for event name masking
+    from model.models import QuizQuestion
+
+    q5 = QuizQuestion.query.filter_by(question_num=5).first()
+    is_q5_revealed = q5.status == "revealed" if q5 else False
+
     return render_template(
         "bet.html",
         event=active_event,
         submitted_bet=submitted_bet,
         options=options,
+        is_q5_revealed=is_q5_revealed,
     )
 
 
@@ -359,7 +374,6 @@ def admin_reveal_quiz(quiz_id: int):
 @admin_required
 def admin_set_event_status(event_id: int):
     status = request.form.get("status")
-    # If starting, close others
     if status == "betting":
         active = repositories.get_active_bet_event()
         if active:
@@ -373,19 +387,90 @@ def admin_set_event_status(event_id: int):
     return redirect(url_for("quiz.admin"))
 
 
-# Admin Action: Settle Payout for Bet Event
+# Admin Action: Settle Payout for Bet Event (格付け①専用ロジック内蔵)
 @quiz_bp.route("/admin/event/<int:event_id>/settle", methods=["POST"])
 @admin_required
 def admin_settle_event(event_id: int):
-    winning_prediction = request.form.get("winning_prediction")
-    success, message = usecases.settle_bet_event(event_id, winning_prediction)
-    if success:
-        socketio.emit(
-            "event_update", {"status": "settled", "event_id": event_id}, namespace="/"
-        )
-        flash(message, "success")
+    event = repositories.get_event_by_id(event_id)
+    if not event:
+        flash("イベントが見つかりません。", "danger")
+        return redirect(url_for("quiz.admin"))
+
+    # 【格付け①】専用の自動合致数集計・配点清算ロジック
+    if "格付け①" in event.event_name:
+        try:
+            from model.models import TeamBet, Team
+
+            bets = repositories.get_bets_for_event(event_id)
+
+            # 管理者が画面から送信した、実際の「真の正解レシピ」を受け取る
+            correct_map = {
+                "赤色": request.form.get("flavor_red", "巨峰").strip(),
+                "青色": request.form.get("flavor_blue", "イチゴ").strip(),
+                "緑色": request.form.get("flavor_green", "イチゴ").strip(),
+                "黄色": request.form.get("flavor_yellow", "グレープ").strip(),
+            }
+
+            for bet in bets:
+                # チームの予測データ形式: "赤色:巨峰, 青色:イチゴ..."
+                pred_text = bet.prediction or ""
+                correct_count = 0
+
+                parts = [p.strip() for p in pred_text.split(",") if ":" in p]
+                for part in parts:
+                    color, flavor = part.split(":", 1)
+                    if color in correct_map and flavor == correct_map[color]:
+                        correct_count += 1
+
+                # 何問合致したかによって、ポイント配点の倍率が変動する
+                if correct_count == 0:
+                    current_mult = 0.0
+                    bet.status = "lost"
+                elif correct_count == 1:
+                    current_mult = 0.8
+                    bet.status = "won"
+                elif correct_count == 2:
+                    current_mult = 1.2
+                    bet.status = "won"
+                else:  # 3問または4問(全問)合致
+                    current_mult = 1.5
+                    bet.status = "won"
+
+                # ポイントを自動払い戻し
+                if current_mult > 0:
+                    team = repositories.get_team_by_id(bet.team_id)
+                    payout = int(bet.bet_points * current_mult)
+                    team.points += payout
+
+            event.status = "settled"
+            db.session.commit()
+            socketio.emit(
+                "event_update",
+                {"status": "settled", "event_id": event_id},
+                namespace="/",
+            )
+            flash(
+                f"【格付け①】の清算が完了しました！管理者が入力した正解レシピに基づき、全チームの合致数を判定して自動配点しました。",
+                "success",
+            )
+        except Exception as e:
+            db.session.rollback()
+            flash(f"清算エラー: {str(e)}", "danger")
+
     else:
-        flash(message, "danger")
+        # 格付け②・③（通常の選択肢一選択方式）の清算
+        winning_prediction = request.form.get("winning_prediction")
+        success, message = usecases.settle_bet_event(event_id, winning_prediction)
+        if success:
+            socketio.emit(
+                "event_update",
+                {"status": "settled", "event_id": event_id},
+                namespace="/",
+            )
+            flash(message, "success")
+        else:
+            flash(message, "danger")
+
     return redirect(url_for("quiz.admin"))
 
 
@@ -394,31 +479,30 @@ def admin_settle_event(event_id: int):
 @admin_required
 def admin_reset():
     try:
-        from model.models import QuizSubmission, TeamBet, BingoSquare
+        from model.models import QuizSubmission, TeamBet, BingoSquare, Team
 
-        # Reset team scores to 500pt
-        for team in repositories.get_all_teams():
-            team.points = 500
-
-        # Delete submissions
         QuizSubmission.query.delete()
-        # Delete bets
         TeamBet.query.delete()
-        # Delete bingo squares
         BingoSquare.query.delete()
 
-        # Reset question statuses to hidden
+        Team.query.filter(Team.team_id > 20).delete()
+        db.session.flush()
+
+        with db.session.no_autoflush:
+            for team in Team.query.all():
+                team.points = 500
+                team.team_name = f"チーム {team.team_id}"
+
         for q in repositories.get_all_questions():
             q.status = "hidden"
 
-        # Reset event statuses to waiting
         for e in repositories.get_all_events():
             e.status = "waiting"
 
         db.session.commit()
         socketio.emit("reset_all", {}, namespace="/")
         flash(
-            "すべての企画データをリセットし、各チームの持ち点を 500pt に初期化しました。",
+            "すべての企画データをリセットし、21チーム目以降の不要データを削除した上で、各チーム（1〜20）の持ち点とチーム名を初期化しました。",
             "success",
         )
     except Exception as e:

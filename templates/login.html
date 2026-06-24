@@ -17,14 +17,19 @@
                 
                 <div id="teamSelectGroup" class="mb-4 text-start">
                     <label for="team_id" class="form-label text-white-50 small"><i class="bi bi-people me-1"></i>あなたのチーム</label>
-                    <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5 mb-3" id="team_id" name="team_id">
+                    <select class="form-select bg-dark border-secondary text-white rounded-3 py-2.5 mb-3" id="team_id" name="team_id" onchange="updateTeamNameInput()">
                         {% for t in teams %}
-                            <option value="{{ t.team_id }}">{{ t.team_name }}</option>
+                            <option value="{{ t.team_id }}" data-custom-name="{{ t.team_name }}">チーム {{ loop.index }}</option>
                         {% endfor %}
                     </select>
                     
                     <label for="team_name_suffix" class="form-label text-white-50 small"><i class="bi bi-pencil-square me-1"></i>チーム名（例: 最強チーム）</label>
                     <input type="text" class="form-control bg-dark border-secondary text-white rounded-3 py-2.5" id="team_name_suffix" name="team_name_suffix" placeholder="チーム名を入力してください">
+                </div>
+
+                <div id="adminPasswordGroup" class="mb-4 text-start" style="display: none;">
+                    <label for="admin_password" class="form-label text-white-50 small"><i class="bi bi-key me-1"></i>管理者パスワード</label>
+                    <input type="password" class="form-control bg-dark border-secondary text-white rounded-3 py-2.5" id="admin_password" name="admin_password" placeholder="パスワードを入力してください">
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100 rounded-pill py-2.5 fw-bold font-outfit mb-3 shadow-neon">
@@ -44,23 +49,46 @@
 
 {% block extra_js %}
 <script>
+    // 選択されたチームの現在のチーム名をテキストボックスに反映させる関数
+    function updateTeamNameInput() {
+        const select = document.getElementById('team_id');
+        const selectedOption = select.options[select.selectedIndex];
+        const customName = selectedOption.getAttribute('data-custom-name');
+        const nameInput = document.getElementById('team_name_suffix');
+        
+        // デフォルトの「チーム X」のまま、あるいは空でなければ、その名前をセット。そうでなければ空にする
+        if (customName && !customName.startsWith('チーム ')) {
+            nameInput.value = customName;
+        } else {
+            nameInput.value = '';
+        }
+    }
+
     function toggleAdminMode() {
         const roleInput = document.getElementById('loginRole');
         const teamGroup = document.getElementById('teamSelectGroup');
+        const adminGroup = document.getElementById('adminPasswordGroup');
         const toggleBtn = document.getElementById('adminToggleBtn');
         const btn = document.querySelector('button[type="submit"]');
         
         if (roleInput.value === 'team') {
             roleInput.value = 'admin';
             teamGroup.style.display = 'none';
+            adminGroup.style.display = 'block';
             btn.innerHTML = '管理者として入場する <i class="bi bi-shield-lock ms-1"></i>';
             toggleBtn.innerHTML = '<i class="bi bi-people me-1"></i>チーム選択に戻る';
         } else {
             roleInput.value = 'team';
             teamGroup.style.display = 'block';
+            adminGroup.style.display = 'none';
             btn.innerHTML = 'アリーナに入場する <i class="bi bi-box-arrow-in-right ms-1"></i>';
             toggleBtn.innerHTML = '<i class="bi bi-shield-lock me-1"></i>司会・管理者はこちら';
         }
     }
+
+    // ページ読み込み時に最初のチーム名を初期セット
+    document.addEventListener('DOMContentLoaded', function() {
+        updateTeamNameInput();
+    });
 </script>
 {% endblock %}
